@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SafetyEye · AI PPE & Hazard Monitor</title>
+<link rel="icon" href="favicon.svg" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><path d="M16 3 4 8v8c0 7 5 11.5 12 13 7-1.5 12-6 12-13V8z" fill="#FFC21A"/><circle cx="16" cy="15" r="5.5" fill="#111418"/><circle cx="16" cy="15" r="2.3" fill="#FFC21A"/></svg>
+    <div><b>SafetyEye</b><span>AI PPE &amp; Hazard Monitor</span></div>
+  </div>
+  <div class="site">Gwalior Plant · Shift B</div>
+  <div class="spacer"></div>
+  <div class="seg" id="lang" role="group" aria-label="Alert language">
+    <button data-l="en" class="on">EN</button><button data-l="hi">हिं</button><button data-l="mr">मरा</button>
+  </div>
+  <button class="chip" id="voice" aria-pressed="false">🔈 Voice alerts</button>
+  <div class="clock" id="clock">--:--</div>
+</header>
+
+<section class="kpis">
+  <div class="kpi"><div class="ring" id="ring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" class="bg"/><circle cx="18" cy="18" r="15.9" class="fg" id="ringfg"/></svg><b id="kComp">–</b></div><div><span>Live PPE compliance</span><small>across all cameras</small></div></div>
+  <div class="kpi"><b id="kWorkers">–</b><div><span>Workers in view</span><small>detected right now</small></div></div>
+  <div class="kpi warn"><b id="kOpen">–</b><div><span>Open incidents</span><small>awaiting acknowledgement</small></div></div>
+  <div class="kpi"><b id="kTotal">–</b><div><span>Incidents · 24h</span><small>auto-logged with snapshot</small></div></div>
+</section>
+
+<main class="grid">
+  <section class="cams card">
+    <div class="cardhead"><h2 id="mainName">Camera</h2><span class="live">● LIVE</span><span class="sub" id="mainStat"></span></div>
+    <div class="main"><img id="mainImg" alt="Selected camera feed with AI annotations" /></div>
+    <div class="thumbs" id="thumbs"></div>
+  </section>
+
+  <aside class="card feed">
+    <div class="cardhead"><h2>Live alerts</h2><span class="sub" id="feedCount"></span></div>
+    <div id="banner" class="banner" hidden></div>
+    <ol id="alerts"></ol>
+  </aside>
+
+  <section class="card chart"><div class="cardhead"><h2>Violations by type</h2></div><canvas id="cType"></canvas></section>
+  <section class="card chart"><div class="cardhead"><h2>Compliance trend</h2><span class="sub">per minute</span></div><canvas id="cTrend"></canvas></section>
+  <section class="card chart"><div class="cardhead"><h2>Hotspots</h2><span class="sub">incidents by camera</span></div><canvas id="cCam"></canvas></section>
+
+  <section class="card report">
+    <div class="cardhead"><h2>Shift report</h2><span class="sub">auto-generated</span>
+      <div class="spacer"></div>
+      <button class="btn" id="genReport">Generate</button>
+      <a class="btn ghost" href="/api/report.csv">Export CSV</a></div>
+    <pre id="reportText">Press Generate for a plain-language summary with recommended actions.</pre>
+  </section>
+
+  <section class="card tools">
+    <div class="cardhead"><h2>Check any image or webcam</h2></div>
+    <div class="toolrow">
+      <label class="btn">Upload photo<input type="file" id="upload" accept="image/*" hidden></label>
+      <button class="btn ghost" id="webcam">Start webcam</button>
+    </div>
+    <div class="toolout"><img id="toolImg" alt="" hidden><video id="cam" autoplay muted playsinline hidden></video><p id="toolMsg" class="sub">Results appear here — no cloud upload, runs on your server.</p></div>
+  </section>
+</main>
+
+<script src="chart.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

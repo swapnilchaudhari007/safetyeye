@@ -17,7 +17,9 @@ from ultralytics import YOLO
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PPE_WEIGHTS = os.environ.get("SAFETYEYE_PPE", os.path.join(ROOT, "models", "ppe.pt"))
-POSE_WEIGHTS = os.environ.get("SAFETYEYE_POSE", os.path.join(ROOT, "models", "yolo11n-pose.pt"))
+_local_pose = os.path.join(ROOT, "models", "yolo11n-pose.pt")
+# falls back to Ultralytics auto-download if the local copy is absent
+POSE_WEIGHTS = os.environ.get("SAFETYEYE_POSE", _local_pose if os.path.exists(_local_pose) else "yolo11n-pose.pt")
 
 # rules that are enforced per site profile
 REQUIRED = {"helmet", "vest"}

@@ -10,12 +10,12 @@ import os
 import sqlite3
 import threading
 import time
-from collections import Counter, defaultdict
+from collections import Counter, defaultdict, deque
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi.responses import Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from detector import ROOT, SafetyEngine
@@ -40,7 +40,9 @@ engine.set_zone("cam-2", [[(0.55, 0.5), (0.95, 0.5), (0.95, 0.86), (0.55, 0.86)]
 lock = threading.Lock()
 latest: dict[str, dict] = {}
 last_alert: dict[tuple, float] = {}
-pending_events: list[dict] = []
+# bounded buffer of (seq, event) so long-running servers don't leak memory
+pending_events: deque = deque(maxlen=1000)
+event_seq = 0
 
 
 def db():
@@ -97,9 +99,12 @@ def handle_result(cam: str, frame: np.ndarray, result: dict):
             )
             new.append({"id": cur.lastrowid, "ts": now, "cam": cam, "camName": CAMERAS.get(cam, {}).get("name", cam),
                         "type": v["type"], "severity": v["severity"], "worker": v["worker"] + 1, "snapshot": snap})
+    global event_seq
     with lock:
         latest[cam] = {"jpg": jpg.tobytes(), "result": result, "ts": now}
-        pending_events.extend(new)
+        for ev in new:
+            event_seq += 1
+            pending_events.append((event_seq, ev))
 
 
 def camera_worker(cam: str, source: str):
@@ -157,6 +162,7 @@ async def stream(cam: str):
 
 @app.get("/api/incidents")
 def incidents(limit: int = 50):
+    limit = max(1, min(limit, 10000))
     with db() as con:
         rows = con.execute("select * from incidents order by id desc limit ?", (limit,)).fetchall()
     return [dict(r) | {"camName": CAMERAS.get(r["cam"], {}).get("name", r["cam"]), "worker": r["worker"] + 1} for r in rows]
@@ -237,7 +243,10 @@ async def set_zone(cam: str, polys: list[list[list[float]]]):
 
 @app.post("/api/analyze")
 async def analyze(file: UploadFile = File(...), cam: str = "upload"):
-    img = cv2.imdecode(np.frombuffer(await file.read(), np.uint8), cv2.IMREAD_COLOR)
+    raw = await file.read()
+    img = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR) if raw else None
+    if img is None:
+        raise HTTPException(400, "Could not read that file as an image")
     res = engine.analyze(img, cam)
     if cam in CAMERAS or cam == "webcam":
         handle_result(cam, img, res)
@@ -254,14 +263,13 @@ def messages():
 @app.websocket("/ws")
 async def ws(sock: WebSocket):
     await sock.accept()
-    sent = 0
     with lock:
-        sent = len(pending_events)
+        sent = event_seq
     try:
         while True:
             with lock:
-                events = pending_events[sent:]
-                sent = len(pending_events)
+                events = [ev for seq, ev in pending_events if seq > sent]
+                sent = event_seq
                 cams = {c: {k: v["result"][k] for k in ("count", "compliance", "violations")} | {"ts": v["ts"]} for c, v in latest.items()}
             await sock.send_text(json.dumps({"cams": cams, "events": events}))
             await asyncio.sleep(0.5)

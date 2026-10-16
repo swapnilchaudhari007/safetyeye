@@ -171,7 +171,9 @@ def incidents(limit: int = 50):
 @app.post("/api/incidents/{iid}/ack")
 def ack(iid: int):
     with db() as con:
-        con.execute("update incidents set acked=1 where id=?", (iid,))
+        cur = con.execute("update incidents set acked=1 where id=?", (iid,))
+    if cur.rowcount == 0:
+        raise HTTPException(404, "No incident with that id")
     return {"ok": True}
 
 
@@ -241,9 +243,14 @@ async def set_zone(cam: str, polys: list[list[list[float]]]):
     return {"ok": True}
 
 
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # a phone photo is ~3-5 MB; refuse anything that would just eat RAM
+
+
 @app.post("/api/analyze")
 async def analyze(file: UploadFile = File(...), cam: str = "upload"):
-    raw = await file.read()
+    raw = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(raw) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "Image too large (max 10 MB)")
     img = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR) if raw else None
     if img is None:
         raise HTTPException(400, "Could not read that file as an image")
